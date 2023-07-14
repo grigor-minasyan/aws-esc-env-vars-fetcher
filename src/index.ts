@@ -1,104 +1,55 @@
-import dotenv from "dotenv";
-import { SSMClient, GetParameterCommand } from "@aws-sdk/client-ssm";
 import {
-  ECSClient,
-  ListTaskDefinitionsCommand,
-  ListTaskDefinitionFamiliesCommand,
-  DescribeTaskDefinitionCommand,
-  KeyValuePair,
-} from "@aws-sdk/client-ecs";
-
-dotenv.config();
-
-const _SSMClient = new SSMClient({ region: "us-east-1" });
-const _ECSClient = new ECSClient({ region: "us-east-1" });
-
-const CONTAINER_NAME = "nvsimplr-simplr-chat-server-qa";
-
-function getShortParamName(name: string) {
-  return name.replace("arn:aws:ssm:us-east-1:080007210919:parameter/", "");
-}
-
-async function getParameter(name: string) {
-  const input = {
-    // GetParameterequest
-    Name: getShortParamName(name),
-    WithDecryption: true,
-  };
-  const command = new GetParameterCommand(input);
-  const response = await _SSMClient.send(command);
-  if (!response.Parameter?.Value) {
-    throw new Error(`No value found for ${name}`);
-  }
-  return response.Parameter.Value;
-}
-
-async function getAllContainerNames() {
-  console.log("getting all container names");
-  const results = [];
-  let res = await _ECSClient.send(
-    new ListTaskDefinitionFamiliesCommand({ status: "ACTIVE" })
-  );
-  if (!res.families) {
-    throw new Error("No families found");
-  }
-  results.push(...res.families);
-  while (res.nextToken) {
-    res = await _ECSClient.send(
-      new ListTaskDefinitionFamiliesCommand({
-        status: "ACTIVE",
-        nextToken: res.nextToken,
-      })
-    );
-    results.push(...(res?.families || []));
-  }
-  return results;
-}
-
-async function getTaskDefinitionName() {
-  // console.log(await getAllContainerNames());
-
-  const res = await _ECSClient.send(
-    new ListTaskDefinitionsCommand({
-      familyPrefix: CONTAINER_NAME,
-      status: "ACTIVE",
-      sort: "DESC",
-      maxResults: 1,
-    })
-  );
-  const taskDefName = res?.taskDefinitionArns?.[0]?.split("/")[1];
-  if (!taskDefName) {
-    throw new Error("No task definition found");
-  }
-  return taskDefName;
-}
-
-const sortStringAsc = (a: KeyValuePair, b: KeyValuePair) =>
-  a.name?.localeCompare(b.name || "") || 0;
-
-async function getContainerDefinition(taskDefName: string) {
-  // getting the task definition description
-  const { taskDefinition } = await _ECSClient.send(
-    new DescribeTaskDefinitionCommand({
-      taskDefinition: taskDefName,
-    })
-  );
-  if (!taskDefinition?.containerDefinitions?.[0]) {
-    throw new Error("No container definition found");
-  }
-  const containerDef = {
-    environment: taskDefinition.containerDefinitions[0].environment || [],
-    secrets: taskDefinition.containerDefinitions[0].secrets || [],
-  };
-
-  containerDef.environment.sort(sortStringAsc);
-  containerDef.secrets.sort(sortStringAsc);
-
-  return containerDef;
-}
+  getAllContainerNames,
+  getContainerDefinition,
+  getParameter,
+  getTaskDefinitionName,
+} from "./utils";
+import pLimit from "p-limit";
+import inquirer from "inquirer";
+import cliProgress from "cli-progress";
 
 (async () => {
-  const taskDefName = await getTaskDefinitionName();
+  // Setting AWS profile
+  const answers = await inquirer.prompt([
+    {
+      type: "input",
+      name: "awsProfile",
+      message: "Enter AWS profile name",
+      default: "asurion-simplr-nonprod_dev",
+    },
+  ]);
+
+  process.env["AWS_PROFILE"] = answers.awsProfile;
+
+  // getting keywords for search
+  const { keywords } = (await inquirer.prompt([
+    {
+      type: "input",
+      name: "keywords",
+      message: "Enter space separated keywords to search for container names",
+      default: "logic processor qa",
+    },
+  ])) as { keywords: string };
+
+  const allContainerNames = await getAllContainerNames();
+
+  const filteredContainerNames = allContainerNames.filter((containerName) =>
+    keywords
+      .toLowerCase()
+      .split(" ")
+      .every((keyword) => containerName.toLowerCase().includes(keyword))
+  );
+
+  const { containerName } = (await inquirer.prompt([
+    {
+      type: "list",
+      name: "containerName",
+      message: "Select container name",
+      choices: filteredContainerNames,
+    },
+  ])) as { containerName: string };
+
+  const taskDefName = await getTaskDefinitionName(containerName);
 
   let finalEnv = "# Non secret environment\n\n";
 
@@ -110,9 +61,15 @@ async function getContainerDefinition(taskDefName: string) {
 
   finalEnv += "\n# Secrets\n\n";
 
-  const pLimit = await import("p-limit");
-  const limit = pLimit.default(10);
+  const limit = pLimit(5);
 
+  const progressBar = new cliProgress.SingleBar(
+    {},
+    cliProgress.Presets.shades_classic
+  );
+  progressBar.start(simplrServerEnv.secrets.length, 0);
+
+  let progress = 0;
   const envVarsToAppend = await Promise.all(
     simplrServerEnv.secrets.map((secret) =>
       limit(async () => {
@@ -120,19 +77,21 @@ async function getContainerDefinition(taskDefName: string) {
           throw new Error("No valueFrom found");
         }
         const value = await getParameter(secret.valueFrom);
-        console.log("received", secret.name);
+        progressBar.update(++progress);
         return `${secret.name}=${value}\n`;
       })
     )
   );
 
+  progressBar.stop();
+
   envVarsToAppend.forEach((envVar) => (finalEnv += envVar));
 
   console.log(
-    "# ------------------------- Final ENV vars -------------------------"
+    "# ------------------------------------------------------------------------------------------------------------------------------------"
   );
   console.log(finalEnv);
   console.log(
-    "# ------------------------------------------------------------------"
+    "# ------------------------------------------------------------------------------------------------------------------------------------"
   );
 })();
