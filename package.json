@@ -10,6 +10,7 @@
     "start": "node build/index.js"
   },
   "author": "",
+  "bin": "./build/index.js",
   "license": "ISC",
   "devDependencies": {
     "@types/cli-progress": "~3.11.0",
