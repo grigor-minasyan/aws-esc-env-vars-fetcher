@@ -2,17 +2,15 @@
   "name": "aws-esc-env-vars-fetcher",
   "version": "1.0.0",
   "description": "This package helps developers fetch the environment variables directly from aws task definitions",
-  "main": "build/index.js",
+  "main": "bin/index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "ts-node src/index.ts",
     "build": "tsc",
-    "start": "node build/index.js"
+    "start": "node bin/index.js"
   },
   "author": "",
-  "bin": {
-    "start": "./build/index.js"
-  },
+  "bin": "./bin/index.js",
   "license": "ISC",
   "devDependencies": {
     "@types/cli-progress": "~3.11.0",
