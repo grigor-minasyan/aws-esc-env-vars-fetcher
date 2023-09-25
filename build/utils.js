@@ -52,7 +52,7 @@ function getParameter(name) {
             return response.Parameter.Value;
         }
         catch (e) {
-            return "ERROR_FETCHING";
+            return "";
         }
     });
 }

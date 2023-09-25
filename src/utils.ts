@@ -41,7 +41,7 @@ export async function getParameter(name: string) {
     }
     return response.Parameter.Value;
   } catch (e) {
-    return "ERROR_FETCHING";
+    return "";
   }
 }
 
