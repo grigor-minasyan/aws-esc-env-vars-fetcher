@@ -34,11 +34,15 @@ export async function getParameter(name: string) {
     WithDecryption: true,
   };
   const command = new GetParameterCommand(input);
-  const response = await _SSMClient.send(command);
-  if (!response.Parameter?.Value) {
-    throw new Error(`No value found for ${name}`);
+  try {
+    const response = await _SSMClient.send(command);
+    if (!response.Parameter?.Value) {
+      throw new Error(`No value found for ${name}`);
+    }
+    return response.Parameter.Value;
+  } catch (e) {
+    return "ERROR_FETCHING";
   }
-  return response.Parameter.Value;
 }
 
 export async function getAllContainerNames() {

@@ -44,11 +44,16 @@ function getParameter(name) {
             WithDecryption: true,
         };
         const command = new client_ssm_1.GetParameterCommand(input);
-        const response = yield _SSMClient.send(command);
-        if (!((_a = response.Parameter) === null || _a === void 0 ? void 0 : _a.Value)) {
-            throw new Error(`No value found for ${name}`);
+        try {
+            const response = yield _SSMClient.send(command);
+            if (!((_a = response.Parameter) === null || _a === void 0 ? void 0 : _a.Value)) {
+                throw new Error(`No value found for ${name}`);
+            }
+            return response.Parameter.Value;
         }
-        return response.Parameter.Value;
+        catch (e) {
+            return "ERROR_FETCHING";
+        }
     });
 }
 exports.getParameter = getParameter;
