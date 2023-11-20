@@ -57,7 +57,7 @@ const cli_progress_1 = __importDefault(require("cli-progress"));
         finalEnv += `${env.name}=${env.value}\n`;
     });
     finalEnv += "\n# Secrets\n\n";
-    const limit = (0, p_limit_1.default)(5);
+    const limit = (0, p_limit_1.default)(10);
     const progressBar = new cli_progress_1.default.SingleBar({}, cli_progress_1.default.Presets.shades_classic);
     progressBar.start(containerDef.secrets.length, 0);
     let progress = 0;

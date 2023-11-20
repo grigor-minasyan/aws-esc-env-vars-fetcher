@@ -62,7 +62,7 @@ import cliProgress from "cli-progress";
 
   finalEnv += "\n# Secrets\n\n";
 
-  const limit = pLimit(5);
+  const limit = pLimit(10);
 
   const progressBar = new cliProgress.SingleBar(
     {},
