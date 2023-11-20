@@ -54,9 +54,9 @@ import cliProgress from "cli-progress";
 
   let finalEnv = "# Non secret environment\n\n";
 
-  const simplrServerEnv = await getContainerDefinition(taskDefName);
+  const containerDef = await getContainerDefinition(taskDefName);
 
-  simplrServerEnv.environment.forEach((env) => {
+  containerDef.environment.forEach((env) => {
     finalEnv += `${env.name}=${env.value}\n`;
   });
 
@@ -68,11 +68,11 @@ import cliProgress from "cli-progress";
     {},
     cliProgress.Presets.shades_classic
   );
-  progressBar.start(simplrServerEnv.secrets.length, 0);
+  progressBar.start(containerDef.secrets.length, 0);
 
   let progress = 0;
   const envVarsToAppend = await Promise.all(
-    simplrServerEnv.secrets.map((secret) =>
+    containerDef.secrets.map((secret) =>
       limit(async () => {
         if (!secret.valueFrom) {
           throw new Error("No valueFrom found");
